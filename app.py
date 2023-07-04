@@ -1,13 +1,15 @@
 from flask import Flask, request, session
 from flask_mysqldb import MySQL
 from passlib.hash import pbkdf2_sha256
+from flask_jwt_extended import JWTManager
+from flask_jwt_extended import create_access_token, get_jwt, jwt_required
 import MySQLdb.cursors
 import yaml
 import re
 import secret
 
 app = Flask(__name__)
-app.secret_key = secret.config_values.get("flask_secret_key")
+app.secret_key = secret.config_values["flask_secret_key"]
 
 # Parse yaml file
 with open('db.yaml', 'r') as file:
@@ -19,6 +21,8 @@ app.config['MYSQL_USER'] = db['mysql_user']
 app.config['MYSQL_PASSWORD'] = db['mysql_password']
 app.config['MYSQL_DB'] = db['mysql_db']
 
+app.config['JWT_SECRET_KEY'] = secret.config_values["jwt_secret_key"]
+jwt = JWTManager(app)
 mysql = MySQL(app)
 
 # register new account
@@ -80,11 +84,12 @@ def login():
 
         if account:
             if pbkdf2_sha256.verify(password, account.get("password")):
+                # create an access token for the user
+                access_token = create_access_token(identity=account["id"])
                 session['loggedin'] = True
-                session['id'] = account['id']
                 session['username'] = account['username']
                 msg = 'Logged in successfully !'
-                return msg
+                return {"msg": msg, "access_token": access_token}
             else:
                 msg = 'Invalid password!'
                 return msg
@@ -95,3 +100,17 @@ def login():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+
+@app.route('/logout', methods=['POST'])
+@jwt_required()
+def logout():
+    token = request.headers.get('Authorization').split()[1]
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute(
+        'INSERT INTO blacklisted_tokens(token) VALUES(%s)',
+        [token]
+    )
+    mysql.connection.commit()
+    msg = 'Successfully logged out!'
+    return msg
