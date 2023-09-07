@@ -3,6 +3,7 @@ from flask_mysqldb import MySQL
 from passlib.hash import pbkdf2_sha256
 from flask_jwt_extended import JWTManager
 from flask_jwt_extended import create_access_token, get_jwt, jwt_required
+from flask_cors import CORS
 import MySQLdb.cursors
 import yaml
 import re
@@ -24,9 +25,9 @@ app.config['MYSQL_DB'] = db['mysql_db']
 app.config['JWT_SECRET_KEY'] = secret.config_values["jwt_secret_key"]
 jwt = JWTManager(app)
 mysql = MySQL(app)
+CORS(app)
 
 # register new account
-
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -70,13 +71,13 @@ def register():
 
 @app.route('/login', methods=['POST'])
 def login():
-    msg = ''
-    if (request.method == 'POST' and 'username' in request.form
-       and 'password' in request.form):
+    response = {}
+    if (request.method == 'POST' and 'username' in request.json
+       and 'password' in request.json):
         # Store the values from the form
-        username = request.form['username']
-        password = request.form['password']
-
+        username = request.json['username']
+        password = request.json['password']
+       
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cursor.execute(
             'SELECT * FROM users WHERE username = % s', (username, ))
@@ -89,13 +90,19 @@ def login():
                 session['loggedin'] = True
                 session['username'] = account['username']
                 msg = 'Logged in successfully !'
-                return {"msg": msg, "access_token": access_token}
+                response['msg'] = msg
+                response['status'] = 200
+                return response
             else:
                 msg = 'Invalid password!'
-                return msg
+                response['msg'] = msg
+                response['status'] = 401
+                return response
         else:
             msg = 'The account does not exist! Please check your username.'
-            return msg
+            response['msg'] = msg
+            response['status'] = 401
+            return response
 
 
 if __name__ == '__main__':
