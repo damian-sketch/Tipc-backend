@@ -31,16 +31,15 @@ CORS(app)
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    msg = ''
-    if (request.method == 'POST' and 'username' in request.form
-        and 'password' in request.form and 'email' in request.form
-            and 'address' in request.form and 'phone_number' in request.form):
+    if (request.method == 'POST' and 'username' in request.json
+        and 'password' in request.json and 'email' in request.json
+            and 'address' in request.json and 'phone_number' in request.json):
         # Store all the values from the request
-        username = request.form['username']
-        password = request.form['password']
-        email = request.form['email']
-        address = request.form['address']
-        phone_number = request.form['phone_number']
+        username = request.json['username']
+        password = request.json['password']
+        email = request.json['email']
+        address = request.json['address']
+        phone_number = request.json['phone_number']
 
         # encrypt the user password for security purposes
         hashed_password = pbkdf2_sha256.hash(password)
@@ -54,17 +53,15 @@ def register():
 
         # Validations for the account details
         if account:
-            msg = 'Account already exists !'
-        elif not re.match(r'[^@]+@[^@]+\.[^@]+', email):
-            msg = 'Invalid email address !'
+            return {'msg': 'Account already exists !'}, 401
         elif not re.match(r'[A-Za-z0-9]+', username):
-            msg = 'name must contain only characters and numbers !'
+            return {'msg': 'Username must contain only characters and numbers !'}, 401
         else:
             cursor.execute("INSERT INTO users(username,password,email,phone_number,address) VALUES(%s, %s, %s, %s, %s)",
                            [username, hashed_password, email, phone_number, address])
             mysql.connection.commit()
-            msg = 'You have successfully registered !'
-    elif request.method == 'POST':
+            return {'msg': 'You have successfully registered! Please login to continue.'}, 201
+    else :
         msg = 'Please fill out the form !'
     return msg
 
@@ -89,20 +86,11 @@ def login():
                 access_token = create_access_token(identity=account["id"])
                 session['loggedin'] = True
                 session['username'] = account['username']
-                msg = 'Logged in successfully !'
-                response['msg'] = msg
-                response['status'] = 200
-                return response
+                return {'msg': 'Logged in successfully'}, 200
             else:
-                msg = 'Invalid password!'
-                response['msg'] = msg
-                response['status'] = 401
-                return response
+                return {'msg': 'Invalid password!'}, 401
         else:
-            msg = 'The account does not exist! Please check your username.'
-            response['msg'] = msg
-            response['status'] = 401
-            return response
+            return {'msg': 'The account does not exist! Please check your username.'}, 401
 
 
 if __name__ == '__main__':
